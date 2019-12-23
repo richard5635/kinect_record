@@ -38,6 +38,11 @@ void Kinect::run()
 	int increment = 0;
 	std::string timeDate = this->getDate();
 
+	// Start OpenCV timer variable here
+	double recordSeconds = 0;
+	cv::TickMeter tm;
+	tm.start();
+
     // Main Loop
     while( true ){
         // Update Data
@@ -54,6 +59,7 @@ void Kinect::run()
 		increment++; if (increment >= 10) increment = 0;
 
 		// Add frame filter. increment = 10 means 10 * 10 ms. Captures in 10 fps.
+		// But this is not always the case. In reality, only 6 frames are captured. So it is important to measure number of photos taken and recording time.
 		if (isCapturing && increment == 0) {
 			this->capture(timeDate, numPhotos);
 			numPhotos++;
@@ -64,10 +70,37 @@ void Kinect::run()
             break;
         }
 		else if (c == 'c') {
-			timeDate = this->getDate();
 			isCapturing = !isCapturing;
-			if(isCapturing) std::cout << "Recording... " << std::endl;
-			else std::cout << "Recording finished." << std::endl;
+			if (isCapturing) {
+				// Capture On
+				numPhotos = 0;
+				timeDate = this->getDate();
+				tm.reset();
+				tm.start();
+				std::cout << "Recording... " << std::endl;
+				recordSeconds = 0;
+			}
+			else {
+				// Capture Off
+				std::cout << "Recording finished." << std::endl;
+				tm.stop();
+				recordSeconds = tm.getTimeSec();
+
+				// Write file. 
+				// Recording time, number of pictures taken. Movement Range: empty
+				std::cout << "Record time: " << recordSeconds << "\n";
+				std::cout << "Frames taken: " << numPhotos << "\n";
+
+				std::ostringstream ss;
+				ss << "Recorder/" << timeDate << "/recordLog.yml";
+				std::string fileName = ss.str();
+				cv::FileStorage fs(fileName, cv::FileStorage::WRITE);
+				fs << "RecordSeconds" << recordSeconds;
+				fs << "FramesTaken" << numPhotos;
+				fs << "Range" << "";
+
+				fs.release();
+			}
 		}
     }
 }
@@ -348,9 +381,10 @@ void Kinect::capture(std::string timeDate, int numPhotos)
 	// ==== Check value of depth image
 	std::cout << "Size of matrix: " << scaleMat.rows << " and " << scaleMat.cols << " ";
 	cv::Mat imgMat = cv::imread(depthName, CV_16U);
-	for (int i = 0; i < 100; i++) {
+	/*for (int i = 0; i < 100; i++) {
 		std::cout << imgMat.at<UINT16>(i, 0) << " ";
-	}
+	}*/
+	std::cout << "\n";
 
 	// This is in series with streaming code. Need to do this in parallel to make it work.
 	//while (true)
